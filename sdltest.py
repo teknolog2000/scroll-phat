@@ -19,55 +19,60 @@ class SoftwareRenderer(sdl2.ext.SoftwareSpriteRenderSystem):
         super(SoftwareRenderer, self).render(components)
 
 
-factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE)
 
 class Pixel:
-    def __init__(self, world, pos_x, pos_y):
+    def __init__(self, world, sprite_factory, pos_x, pos_y):
         self.entity = sdl2.ext.Entity(world)
+        self.sprite_factory = sprite_factory
         self.pos_x = pos_x
         self.pos_y = pos_y
         self.set_brightness(255)        
 
     def set_brightness(self, b):
         print('setting brightness')
-        self.entity.sprite = factory.from_color(sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
+        self.entity.sprite = self.sprite_factory.from_color(sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
         self.entity.sprite.position = (self.pos_x, self.pos_y)
 
+class SDLPhat:
+    def __init__(self):
+        sdl2.ext.init()
+        window = sdl2.ext.Window("pHATmulator", size=(WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX))
+        window.show()
+
+        self.world = sdl2.ext.World()
+
+        spriterenderer = SoftwareRenderer(window)
+        self.world.add_system(spriterenderer)
+
+        self.sprite_factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE)
+
+        self.pixels = [None] * COLUMNS
+
+        for col in range(COLUMNS):
+            self.pixels[col] = [None] * ROWS
+            for row in range(ROWS):
+                x = PIXELS_PER_LED * col
+                y = PIXELS_PER_LED * row
+                print('x:', x, 'y:', y)
+                self.pixels[col][row] = Pixel(self.world, self.sprite_factory, x, y)
 
 
-def run():
-    sdl2.ext.init()
-    window = sdl2.ext.Window("pHATmulator", size=(WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX))
-    window.show()
-
-    world = sdl2.ext.World()
-
-    spriterenderer = SoftwareRenderer(window)
-    world.add_system(spriterenderer)
-
-    
-
-    pixels = [None] * COLUMNS
-
-    for col in range(COLUMNS):
-        pixels[col] = [None] * ROWS
-        for row in range(ROWS):
-            x = PIXELS_PER_LED * col
-            y = PIXELS_PER_LED * row
-            print('x:', x, 'y:', y)
-            pixels[col][row] = Pixel(world, x, y)
-
-    running = True
-    while running:
-        events = sdl2.ext.get_events()
-        for event in events:
-            if event.type == sdl2.SDL_QUIT:
-                running = False
-                break
-            elif event.type == sdl2.SDL_KEYDOWN:
-                print('key')
-                pixels[4][3].set_brightness(128)
-        world.process()
+    def run(self):
+        running = True
+        while running:
+            events = sdl2.ext.get_events()
+            for event in events:
+                if event.type == sdl2.SDL_QUIT:
+                    running = False
+                    break
+                elif event.type == sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_ESCAPE:
+                        running = False
+                        break
+                else:
+                    self.pixels[4][3].set_brightness(128)
+            self.world.process()
 
 if __name__ == "__main__":
-    sys.exit(run())
+    sdl_phat = SDLPhat()
+    sys.exit(sdl_phat.run())
