@@ -1,7 +1,7 @@
 from library.scrollphat.IS31FL3730 import I2cConstants
 import logging
 import sys
-
+from sdl_phat import SDLPhat
 
 def setup_logging():
     root = logging.getLogger()
@@ -21,25 +21,25 @@ setup_logging()
 class SMBus:
     def __init__(self, dummy):
         self.constants = I2cConstants()
-        self.constants.CMD_OTHER = 0x01
-        self.brightness = 255
+        self.constants.CMD_SET_PIXELS = 0x01
+        self.sdl_phat = SDLPhat()
 
     def write_i2c_block_data(self, addr, cmd, vals):
         assert addr == self.constants.I2C_ADDR
 
-        assert cmd in [self.constants.CMD_OTHER, self.constants.CMD_SET_MODE,
+        assert cmd in [self.constants.CMD_SET_PIXELS, self.constants.CMD_SET_MODE,
                        self.constants.CMD_SET_BRIGHTNESS]
 
         if cmd == self.constants.CMD_SET_MODE:
+            assert len(vals) == 1
             assert vals[0] == self.constants.MODE_5X11
-            logging.info('set mode')
         elif cmd == self.constants.CMD_SET_BRIGHTNESS:
             assert len(vals) == 1
-            self.brightness = vals[0]
-            logging.info('set brightness to %d', self.brightness)
-        elif cmd == self.constants.CMD_OTHER:
-            logging.info('other')
-            self.handle_other(vals)
+            self.sdl_phat.set_brightness(vals[0])
+        elif cmd == self.constants.CMD_SET_PIXELS:
+            assert len(vals) == 12
+            assert vals[-1] == 0xFF
+            self.sdl_phat.set_pixels(vals)
+        
+        self.sdl_phat.pump()
 
-    def handle_other(self, vals):
-        pass
