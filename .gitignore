@@ -28,3 +28,4 @@ packaging/*tar.xz
 sphinx.virtualenv/
 .mypy_cache
 venv/
+.vscode/
