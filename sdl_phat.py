@@ -1,28 +1,20 @@
-#! python3
 import sys
 import sdl2
 import sdl2.ext
-import os
 import errno
 import pickle
-from smbus import Command 
 from library.scrollphat.IS31FL3730 import I2cConstants
 
 
 ROWS = 5
 COLUMNS = 11
-PIXELS_PER_LED = 100
-WINDOW_WIDTH_PX = PIXELS_PER_LED * COLUMNS
-WINDOW_HEIGHT_PX = PIXELS_PER_LED * ROWS
+PIXELS_PER_LED = 50
+LINE_WIDTH = 5
+LINE_COLOR = (100, 100, 100)
+WINDOW_HEIGHT = PIXELS_PER_LED * ROWS + LINE_WIDTH * (ROWS - 1)
+WINDOW_WIDTH = PIXELS_PER_LED * COLUMNS + LINE_WIDTH * (COLUMNS - 1)
 
-
-class SoftwareRenderer(sdl2.ext.SoftwareSpriteRenderSystem):
-    def __init__(self, window):
-        super(SoftwareRenderer, self).__init__(window)
-
-    def render(self, components):
-        sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
-        super(SoftwareRenderer, self).render(components)
+print('WINDOW_HEIGHT', WINDOW_HEIGHT, 'WINDOW_WIDTH', WINDOW_WIDTH)
 
 
 class Pixel:
@@ -31,10 +23,11 @@ class Pixel:
         self.sprite_factory = sprite_factory
         self.pos_x = pos_x
         self.pos_y = pos_y
-        self.set_brightness(0)        
+        self.set_brightness(0)
 
     def set_brightness(self, b):
-        self.entity.sprite = self.sprite_factory.from_color(sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
+        self.entity.sprite = self.sprite_factory.from_color(
+            sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
         self.entity.sprite.position = (self.pos_x, self.pos_y)
 
 
@@ -46,12 +39,12 @@ class SDLPhat:
         self.constants.CMD_SET_PIXELS = 0x01
 
         sdl2.ext.init()
-        self.window = sdl2.ext.Window("pHATmulator", size=(WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX))
+        self.window = sdl2.ext.Window(
+            "pHATmulator", size=(WINDOW_WIDTH, WINDOW_HEIGHT))
         self.window.show()
 
         self.world = sdl2.ext.World()
-
-        self.world.add_system(SoftwareRenderer(self.window))
+        self.world.add_system(sdl2.ext.SoftwareSpriteRenderSystem(self.window))
 
         self.sprite_factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE)
 
@@ -60,9 +53,9 @@ class SDLPhat:
         for col in range(COLUMNS):
             self.pixels[col] = [None] * ROWS
             for row in range(ROWS):
-                x = PIXELS_PER_LED * col
-                y = PIXELS_PER_LED * row
-                self.pixels[col][row] = Pixel(self.world, self.sprite_factory, x, y)
+
+                self.pixels[col][row] = Pixel(self.world, self.sprite_factory,
+                                              (PIXELS_PER_LED + LINE_WIDTH) * col, (PIXELS_PER_LED + LINE_WIDTH) * row)
 
         self.world.process()
 
@@ -101,7 +94,7 @@ class SDLPhat:
                         raise
                 except EOFError:
                     running = False
-           
+
             events = sdl2.ext.get_events()
             for event in events:
                 if event.type == sdl2.SDL_QUIT:
@@ -109,7 +102,7 @@ class SDLPhat:
                 elif event.type == sdl2.SDL_KEYDOWN:
                     if event.key.keysym.sym == sdl2.SDLK_ESCAPE:
                         running = False
-                        
+
             self.window.refresh()
             self.world.process()
 

@@ -13,11 +13,13 @@ class SMBus:
     def __init__(self, dummy):
         self.constants = I2cConstants()
         self.constants.CMD_SET_PIXELS = 0x01
+
         self.pipe_name = tempfile.NamedTemporaryFile().name
         os.mkfifo(self.pipe_name)
-        self.sdl_phat_process = subprocess.Popen([sys.executable, 'sdl_phat.py', self.pipe_name])
+        self.sdl_phat_process = subprocess.Popen(
+            [sys.executable, 'sdl_phat.py', self.pipe_name])
         self.pipe = open(self.pipe_name, 'wb')
-        
+
     def write_i2c_block_data(self, addr, cmd, vals):
         assert addr == self.constants.I2C_ADDR
 
@@ -39,5 +41,3 @@ class SMBus:
         except OSError:
             print('lost connection with SDL phat')
             sys.exit(-1)
-            
-        
