@@ -40,5 +40,5 @@ class SMBus:
             pickle.dump(Command(cmd=cmd, vals=vals), self.pipe)
             self.pipe.flush()
         except OSError:
-            print('lost connection with pHAT simulator')
+            print('lost connection with scroll pHAT simulator')
             sys.exit(-1)

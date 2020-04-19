@@ -45,10 +45,9 @@ class TkPhatSimulator(ScrollPhatSimulator):
             self.root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
         self.canvas.config(highlightthickness=0)
 
-        self.draw_pixels()
-
     def run(self):
         try:
+            self.draw_pixels()
             self.root.mainloop()
         except KeyboardInterrupt:
             pass
@@ -66,20 +65,18 @@ class TkPhatSimulator(ScrollPhatSimulator):
         self.canvas.delete(tk.ALL)
         self.canvas.create_rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
 
-        color = '#%02x%02x%02x' % (
-            self.brightness, self.brightness, self.brightness)
+        color = '#%02x%02x%02x' % (self.brightness, self.brightness, self.brightness)
 
         for col in range(COLUMNS):
             for row in range(ROWS):
                 x = (PIXELS_PER_LED + LINE_WIDTH) * col
                 y = (PIXELS_PER_LED + LINE_WIDTH) * row
-                self.canvas.create_rectangle(
-                    x, y, x + PIXELS_PER_LED, y + PIXELS_PER_LED, width=0, fill=color
-                    if self.pixels[col][row] else 'black')
+                self.canvas.create_rectangle(x, y, x + PIXELS_PER_LED, y + PIXELS_PER_LED, width=0, fill=color
+                                             if self.pixels[col][row] else 'black')
 
         self.canvas.pack()
 
-        self.root.after(10, self.draw_pixels)
+        self.root.after(50, self.draw_pixels)
 
     def set_pixels(self, vals):
         for col in range(COLUMNS):
