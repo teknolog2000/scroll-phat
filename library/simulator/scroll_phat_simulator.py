@@ -48,7 +48,12 @@ class TkPhatSimulator(ScrollPhatSimulator):
         self.draw_pixels()
 
     def run(self):
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        except KeyboardInterrupt:
+            pass
+        except Exception:
+            pass
 
     def destroy(self):
         self.running = False
@@ -113,8 +118,7 @@ class FifoThead:
             except OSError as err:
                 if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
                     raise
-            except Exception as e:
-                print(e)
+            except Exception:
                 self.scroll_phat_simulator.destroy()
                 break
 
