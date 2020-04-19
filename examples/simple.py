@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 import time
 
 import scrollphat
@@ -11,4 +10,4 @@ for x in range(11):
     for y in range(5):
         scrollphat.set_pixel(x, y, 1)
         scrollphat.update()
-        time.sleep(0.1)
+        time.sleep(0.05)
