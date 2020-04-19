@@ -1,11 +1,4 @@
 import sys
-try:
-    import sdl2
-    import sdl2.ext
-except ImportError:
-    print('sdl2 missing, please do pip install pysdl2')  # todo
-    sys.exit(-1)
-
 import errno
 import pickle
 from library.scrollphat.IS31FL3730 import I2cConstants
@@ -36,88 +29,26 @@ class ScrollPhatSimulator:
         raise NotImplementedError()
 
 
-class Pixel:
-    def __init__(self, world, sprite_factory, pos_x, pos_y):
-        self.entity = sdl2.ext.Entity(world)
-        self.sprite_factory = sprite_factory
-        self.pos_x = pos_x
-        self.pos_y = pos_y
-        self.set_brightness(0)
-
-    def set_brightness(self, b):
-        self.entity.sprite = self.sprite_factory.from_color(
-            sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
-        self.entity.sprite.position = (self.pos_x, self.pos_y)
-
-
-class SDLPhatSimulator(ScrollPhatSimulator):
-    def __init__(self):
-        self.running = True
-        sdl2.ext.init()
-
-        self.window = sdl2.ext.Window(
-            "pHATmulator", size=(WINDOW_WIDTH, WINDOW_HEIGHT))
-        self.window.show()
-
-        self.world = sdl2.ext.World()
-        self.world.add_system(sdl2.ext.SoftwareSpriteRenderSystem(self.window))
-        self.sprite_factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE)
-
-        self.pixels = [[0]*ROWS for i in range(COLUMNS)]
-
-        for col in range(COLUMNS):
-            for row in range(ROWS):
-                self.pixels[col][row] = Pixel(self.world, self.sprite_factory,
-                                              (PIXELS_PER_LED + LINE_WIDTH) * col, (PIXELS_PER_LED + LINE_WIDTH) * row)
-
-    def set_pixels(self, vals):
-        for col in range(COLUMNS):
-            for row in range(ROWS):
-                if vals[col] & (1 << row):
-                    self.pixels[col][row].set_brightness(255)
-                else:
-                    self.pixels[col][row].set_brightness(0)
-
-    def destroy(self):
-        self.running = False
-
-    def run(self):
-
-        # processor = sdl2.ext.TestEventProcessor()
-
-        # processor.run(self.window)
-
-        while self.running:
-            events = sdl2.ext.get_events()
-            for event in events:
-                if event.type == sdl2.SDL_QUIT:
-                    self.destroy()
-
-            self.window.refresh()
-            self.world.process()
-
-
 class TkPhatSimulator(ScrollPhatSimulator):
     def __init__(self):
+        self.brightness = 70
+        self.running = True
+        self.pixels = [[False]*ROWS for i in range(COLUMNS)]
+
         self.root = tk.Tk()
         self.root.resizable(False, False)
 
-        self.root.bind('<Control-c>', self.destroy)
+        self.root.bind('<Control-c>', lambda x: self.destroy())
 
-        self.root.title('pHAT')
+        self.root.title('scroll pHAT simulator')
         self.root.geometry('{}x{}'.format(WINDOW_WIDTH, WINDOW_HEIGHT))
         self.canvas = tk.Canvas(
             self.root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
         self.canvas.config(highlightthickness=0)
 
-        self.running = True
-
-        self.pixels = [[0]*ROWS for i in range(COLUMNS)]
-
         self.draw_pixels()
 
     def run(self):
-        print('run')
         self.root.mainloop()
 
     def destroy(self):
@@ -129,16 +60,18 @@ class TkPhatSimulator(ScrollPhatSimulator):
             return
 
         self.canvas.delete(tk.ALL)
-        self.canvas.create_rectangle(
-            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
+        self.canvas.create_rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
+
+        color = '#%02x%02x%02x' % (
+            self.brightness, self.brightness, self.brightness)
 
         for col in range(COLUMNS):
             for row in range(ROWS):
                 x = (PIXELS_PER_LED + LINE_WIDTH) * col
                 y = (PIXELS_PER_LED + LINE_WIDTH) * row
                 self.canvas.create_rectangle(
-                    x, y, x + PIXELS_PER_LED, y + PIXELS_PER_LED, width=0, fill='white' if self.pixels[col][row]
-                    else 'black')
+                    x, y, x + PIXELS_PER_LED, y + PIXELS_PER_LED, width=0, fill=color
+                    if self.pixels[col][row] else 'black')
 
         self.canvas.pack()
 
@@ -147,10 +80,14 @@ class TkPhatSimulator(ScrollPhatSimulator):
     def set_pixels(self, vals):
         for col in range(COLUMNS):
             for row in range(ROWS):
-                if vals[col] & (1 << row):
-                    self.pixels[col][row] = 1
-                else:
-                    self.pixels[col][row] = 0
+                self.pixels[col][row] = vals[col] & (1 << row)
+
+    def set_brightness(self, brightness):
+        # the scroll phat has a pretty high minimum brightness, even at 1 it is quite visible
+        # and most examples seem to set it in the range 3..20, so we want to make those changes
+        # quite noticeable, with decreasing difference as we go higher in the band
+
+        self.brightness = 100 + int(brightness*155/255)
 
 
 class FifoThead:
@@ -162,16 +99,18 @@ class FifoThead:
         self.constants.CMD_SET_PIXELS = 0x01
 
         self.fifo = None
-        self.fifo_thread = threading.Thread(target=self.read_fifo)
+        self.fifo_thread = threading.Thread(target=self._read_fifo)
+
+    def start(self):
         self.fifo_thread.start()
 
-    def read_fifo(self):
+    def _read_fifo(self):
         while True:
             if not self.fifo:
                 self.fifo = open(self.fifo_name, 'rb')
 
             try:
-                self.handle_command(pickle.load(self.fifo))
+                self._handle_command(pickle.load(self.fifo))
             except OSError as err:
                 if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
                     raise
@@ -180,7 +119,7 @@ class FifoThead:
                 self.scroll_phat_simulator.destroy()
                 break
 
-    def handle_command(self, command):
+    def _handle_command(self, command):
         if command.cmd == self.constants.CMD_SET_BRIGHTNESS:
             assert len(command.vals) == 1
             self.scroll_phat_simulator.set_brightness(command.vals[0])
@@ -199,10 +138,9 @@ def main():
 
     fifo_name = sys.argv[1]
 
-#    phat = TkPhatSimulator()
-    phat = SDLPhatSimulator()
-    FifoThead(fifo_name, phat)
-
+    phat = TkPhatSimulator()
+    thread = FifoThead(fifo_name, phat)
+    thread.start()
     phat.run()
 
 
