@@ -1,4 +1,4 @@
-from library.scrollphat.IS31FL3730 import I2cConstants
+from scrollphat.IS31FL3730 import I2cConstants
 import sys
 import subprocess
 import tempfile
@@ -16,8 +16,9 @@ class SMBus:
 
         self.pipe_name = tempfile.NamedTemporaryFile().name
         os.mkfifo(self.pipe_name)
+
         self.sdl_phat_process = subprocess.Popen(
-            [sys.executable, 'sdl_phat.py', self.pipe_name])
+            [sys.executable, os.path.dirname(os.path.abspath(__file__)) + '/scroll_phat_simulator.py', self.pipe_name])
         self.pipe = open(self.pipe_name, 'wb')
 
     def write_i2c_block_data(self, addr, cmd, vals):

@@ -1,10 +1,9 @@
+import threading
 import sys
 import errno
 import pickle
-from library.scrollphat.IS31FL3730 import I2cConstants
+from scrollphat.IS31FL3730 import I2cConstants
 import tkinter as tk
-
-import threading
 
 ROWS = 5
 COLUMNS = 11
