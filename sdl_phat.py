@@ -1,14 +1,20 @@
+#! python3
 import sys
 import sdl2
 import sdl2.ext
-import time
-import threading
+import os
+import errno
+import pickle
+from smbus import Command 
+from library.scrollphat.IS31FL3730 import I2cConstants
+
 
 ROWS = 5
 COLUMNS = 11
 PIXELS_PER_LED = 100
-WINDOW_WIDTH_PX=PIXELS_PER_LED * COLUMNS
+WINDOW_WIDTH_PX = PIXELS_PER_LED * COLUMNS
 WINDOW_HEIGHT_PX = PIXELS_PER_LED * ROWS
+
 
 class SoftwareRenderer(sdl2.ext.SoftwareSpriteRenderSystem):
     def __init__(self, window):
@@ -17,7 +23,6 @@ class SoftwareRenderer(sdl2.ext.SoftwareSpriteRenderSystem):
     def render(self, components):
         sdl2.ext.fill(self.surface, sdl2.ext.Color(0, 0, 0))
         super(SoftwareRenderer, self).render(components)
-
 
 
 class Pixel:
@@ -32,9 +37,13 @@ class Pixel:
         self.entity.sprite = self.sprite_factory.from_color(sdl2.ext.Color(b, b, b), size=(PIXELS_PER_LED, PIXELS_PER_LED))
         self.entity.sprite.position = (self.pos_x, self.pos_y)
 
+
 class SDLPhat:
     def __init__(self):
         self.brightness = 255
+        self.fifo = None
+        self.constants = I2cConstants()
+        self.constants.CMD_SET_PIXELS = 0x01
 
         sdl2.ext.init()
         self.window = sdl2.ext.Window("pHATmulator", size=(WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX))
@@ -68,26 +77,49 @@ class SDLPhat:
                 else:
                     self.pixels[col][row].set_brightness(0)
 
+    def handle_command(self, command):
+        if command.cmd == self.constants.CMD_SET_BRIGHTNESS:
+            assert len(command.vals) == 1
+            self.set_brightness(command.vals[0])
+        elif command.cmd == self.constants.CMD_SET_PIXELS:
+            assert len(command.vals) == 12
+            assert command.vals[-1] == 0xFF
+            self.set_pixels(command.vals)
 
-    def pump(self):
-        print('pump')
-        events = sdl2.ext.get_events()
-        for event in events:
-            if event.type == sdl2.SDL_QUIT:
-                raise Exception('boom')
-            elif event.type == sdl2.SDL_KEYDOWN:
-                if event.key.keysym.sym == sdl2.SDLK_ESCAPE:
-                    raise Exception('bam')
-                else:
-                    self.pixels[4][3].set_brightness(128)
+    def run_from_fifo(self, fifo_name):
+        running = True
+
+        while running:
+            if not self.fifo:
+                self.fifo = open(fifo_name, 'rb')
+
+            if self.fifo:
+                try:
+                    self.handle_command(pickle.load(self.fifo))
+                except OSError as err:
+                    if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
+                        raise
+                except EOFError:
+                    running = False
+           
+            events = sdl2.ext.get_events()
+            for event in events:
+                if event.type == sdl2.SDL_QUIT:
+                    running = False
+                elif event.type == sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_ESCAPE:
+                        running = False
+                        
+            self.window.refresh()
             self.world.process()
 
-        sdl2.SDL_Delay(10)
-
-        self.window.refresh()
 
 if __name__ == "__main__":
+    print('starting SDL pHATmulator')
     dl_phat = SDLPhat()
-    while True:
-        time.sleep(1)
-        dl_phat.pump()
+
+    if len(sys.argv) != 2:
+        print('need to specify fifo name')
+        sys.exit(1)
+
+    dl_phat.run_from_fifo(sys.argv[1])
