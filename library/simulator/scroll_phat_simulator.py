@@ -2,8 +2,10 @@ import threading
 import sys
 import errno
 import pickle
-from scrollphat.IS31FL3730 import I2cConstants
 import tkinter as tk
+from enum import Enum
+import time
+import signal
 
 ROWS = 5
 COLUMNS = 11
@@ -12,6 +14,12 @@ LINE_WIDTH = 5
 
 WINDOW_HEIGHT = PIXELS_PER_LED * ROWS + LINE_WIDTH * (ROWS - 1)
 WINDOW_WIDTH = PIXELS_PER_LED * COLUMNS + LINE_WIDTH * (COLUMNS - 1)
+
+
+class Cmds(Enum):
+    CMD_SET_MODE = 0x00
+    CMD_SET_BRIGHTNESS = 0x19
+    CMD_SET_PIXELS = 0x01
 
 
 class ScrollPhatSimulator:
@@ -37,7 +45,9 @@ class TkPhatSimulator(ScrollPhatSimulator):
         self.root = tk.Tk()
         self.root.resizable(False, False)
 
-        self.root.bind('<Control-c>', lambda x: self.destroy())
+        self.root.bind('<Control-c>', lambda _: self.destroy())
+        self.root.bind("<Unmap>", lambda _: self.destroy())
+        self.root.protocol('WM_DELETE_WINDOW', self.destroy)
 
         self.root.title('scroll pHAT simulator')
         self.root.geometry('{}x{}'.format(WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -49,10 +59,9 @@ class TkPhatSimulator(ScrollPhatSimulator):
         try:
             self.draw_pixels()
             self.root.mainloop()
-        except KeyboardInterrupt:
-            pass
-        except Exception:
-            pass
+        except Exception as e:
+            print(e)
+            self.destroy()
 
     def destroy(self):
         self.running = False
@@ -76,7 +85,7 @@ class TkPhatSimulator(ScrollPhatSimulator):
 
         self.canvas.pack()
 
-        self.root.after(50, self.draw_pixels)
+        self.root.after(100, self.draw_pixels)
 
     def set_pixels(self, vals):
         for col in range(COLUMNS):
@@ -96,34 +105,34 @@ class FifoThead:
         self.fifo_name = fifo_name
         self.scroll_phat_simulator = scroll_phat_simulator
 
-        self.constants = I2cConstants()
-        self.constants.CMD_SET_PIXELS = 0x01
-
         self.fifo = None
-        self.fifo_thread = threading.Thread(target=self._read_fifo)
+        self.fifo_thread = threading.Thread(target=self._read_fifo, daemon=True)
 
     def start(self):
         self.fifo_thread.start()
 
     def _read_fifo(self):
         while True:
-            if not self.fifo:
-                self.fifo = open(self.fifo_name, 'rb')
-
             try:
+                if not self.fifo:
+                    self.fifo = open(self.fifo_name, 'rb')
                 self._handle_command(pickle.load(self.fifo))
-            except OSError as err:
-                if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
-                    raise
-            except Exception:
-                self.scroll_phat_simulator.destroy()
-                break
+            except FileNotFoundError:
+                print('waiting for fifo', self.fifo_name)
+                time.sleep(1)
+            # except OSError as err:
+            #     if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
+            #         raise
+            #     print(err)
+            # except Exception:
+            #     self.scroll_phat_simulator.destroy()
+            #     break
 
     def _handle_command(self, command):
-        if command.cmd == self.constants.CMD_SET_BRIGHTNESS:
+        if command.cmd == Cmds.CMD_SET_BRIGHTNESS:
             assert len(command.vals) == 1
             self.scroll_phat_simulator.set_brightness(command.vals[0])
-        elif command.cmd == self.constants.CMD_SET_PIXELS:
+        elif command.cmd == Cmds.CMD_SET_PIXELS:
             assert len(command.vals) == 12
             assert command.vals[-1] == 0xFF
             self.scroll_phat_simulator.set_pixels(command.vals)
@@ -137,6 +146,8 @@ def main():
         sys.exit(1)
 
     fifo_name = sys.argv[1]
+
+    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
 
     phat = TkPhatSimulator()
     thread = FifoThead(fifo_name, phat)
