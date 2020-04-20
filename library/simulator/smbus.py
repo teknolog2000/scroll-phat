@@ -4,7 +4,7 @@ import tempfile
 from collections import namedtuple
 import pickle
 import os
-
+import time
 from scroll_phat_simulator import Cmds
 
 Command = namedtuple('Command', ['cmd', 'vals'])
@@ -13,22 +13,15 @@ Command = namedtuple('Command', ['cmd', 'vals'])
 class SMBus:
     def __init__(self, dummy):
         self.pipe = None
-        try:
-            self._start_simulator()
-        except OSError as e:
-            print(e)
+        self._start_simulator()
 
     def _start_simulator(self):
         pipe_name = tempfile.NamedTemporaryFile().name
         os.mkfifo(pipe_name)
 
-        print([sys.executable, os.path.dirname(os.path.abspath(__file__)) + '/scroll_phat_simulator.py', pipe_name])
         self.sdl_phat_process = subprocess.Popen(
             [sys.executable, os.path.dirname(os.path.abspath(__file__)) + '/scroll_phat_simulator.py', pipe_name])
-        print(self.sdl_phat_process.returncode)
-        print('opening', pipe_name)
         self.pipe = open(pipe_name, 'wb')
-        print('started')
 
     def write_i2c_block_data(self, addr, cmd, vals):
         I2C_ADDR = 0x60

@@ -128,11 +128,11 @@ class FifoThead:
                 self.scroll_phat_simulator.destroy()
 
     def _handle_command(self, command):
-        print(command)
-        if command.cmd == Cmds.CMD_SET_BRIGHTNESS:
+        # for some reason i need to compare the values here, perhaps a pickling issue?
+        if command.cmd.value == Cmds.CMD_SET_BRIGHTNESS.value:
             assert len(command.vals) == 1
             self.scroll_phat_simulator.set_brightness(command.vals[0])
-        elif command.cmd == Cmds.CMD_SET_PIXELS:
+        elif command.cmd.value == Cmds.CMD_SET_PIXELS.value:
             assert len(command.vals) == 12
             assert command.vals[-1] == 0xFF
             self.scroll_phat_simulator.set_pixels(command.vals)
