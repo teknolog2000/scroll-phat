@@ -120,15 +120,15 @@ class FifoThead:
             except FileNotFoundError:
                 print('waiting for fifo', self.fifo_name)
                 time.sleep(1)
-            # except OSError as err:
-            #     if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
-            #         raise
-            #     print(err)
-            # except Exception:
-            #     self.scroll_phat_simulator.destroy()
-            #     break
+            except OSError as err:
+                if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
+                    raise
+                print(err)
+            except Exception:
+                self.scroll_phat_simulator.destroy()
 
     def _handle_command(self, command):
+        print(command)
         if command.cmd == Cmds.CMD_SET_BRIGHTNESS:
             assert len(command.vals) == 1
             self.scroll_phat_simulator.set_brightness(command.vals[0])

@@ -1,4 +1,3 @@
-from scrollphat.IS31FL3730 import I2cConstants
 import sys
 import subprocess
 import tempfile
@@ -13,7 +12,6 @@ Command = namedtuple('Command', ['cmd', 'vals'])
 
 class SMBus:
     def __init__(self, dummy):
-        self.constants = I2cConstants()
         self.pipe = None
         try:
             self._start_simulator()
