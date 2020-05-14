@@ -34,6 +34,9 @@ class ScrollPhatSimulator:
     def run(self):
         raise NotImplementedError()
 
+    def running(self):
+        raise NotImplementedError()
+
     def destroy(self):
         raise NotImplementedError()
 
@@ -41,7 +44,7 @@ class ScrollPhatSimulator:
 class TkPhatSimulator(ScrollPhatSimulator):
     def __init__(self):
         self.brightness = 70
-        self.running = True
+        self.do_run = True
         self.pixels = [[False]*ROWS for i in range(COLUMNS)]
 
         self.root = tk.Tk()
@@ -66,10 +69,13 @@ class TkPhatSimulator(ScrollPhatSimulator):
             self.destroy()
 
     def destroy(self):
-        self.running = False
+        self.do_run = False
+
+    def running(self):
+        return self.do_run
 
     def draw_pixels(self):
-        if not self.running:
+        if not self.running():
             self.root.destroy()
             return
 
@@ -117,7 +123,7 @@ class ReadThread:
         self.stdin_thread.join()
 
     def _read_stdin(self):
-        while self.scroll_phat_simulator.running:
+        while self.scroll_phat_simulator.running():
             try:
                 self._handle_command(pickle.load(sys.stdin.buffer))
             except EOFError:
