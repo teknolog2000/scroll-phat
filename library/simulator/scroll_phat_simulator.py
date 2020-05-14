@@ -72,9 +72,11 @@ class TkPhatSimulator(ScrollPhatSimulator):
             return
 
         self.canvas.delete(tk.ALL)
-        self.canvas.create_rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
+        self.canvas.create_rectangle(
+            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
 
-        color = '#%02x%02x%02x' % (self.brightness, self.brightness, self.brightness)
+        color = '#%02x%02x%02x' % (
+            self.brightness, self.brightness, self.brightness)
 
         for col in range(COLUMNS):
             for row in range(ROWS):
@@ -100,31 +102,24 @@ class TkPhatSimulator(ScrollPhatSimulator):
         self.brightness = 100 + int(brightness*155/255)
 
 
-class FifoThead:
-    def __init__(self, fifo_name, scroll_phat_simulator):
-        self.fifo_name = fifo_name
+class ReadThread:
+    def __init__(self, scroll_phat_simulator):
         self.scroll_phat_simulator = scroll_phat_simulator
-
-        self.fifo = None
-        self.fifo_thread = threading.Thread(target=self._read_fifo, daemon=True)
+        self.stdin_thread = threading.Thread(
+            target=self._read_stdin, daemon=True)
 
     def start(self):
-        self.fifo_thread.start()
+        self.stdin_thread.start()
 
-    def _read_fifo(self):
+    def _read_stdin(self):
         while True:
             try:
-                if not self.fifo:
-                    self.fifo = open(self.fifo_name, 'rb')
-                self._handle_command(pickle.load(self.fifo))
-            except FileNotFoundError:
-                print('waiting for fifo', self.fifo_name)
-                time.sleep(1)
-            except OSError as err:
-                if err.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
-                    raise
+                self._handle_command(pickle.load(sys.stdin.buffer))
+            except EOFError as err:
                 print(err)
-            except Exception:
+                self.scroll_phat_simulator.destroy()
+            except Exception as err:
+                print(err)
                 self.scroll_phat_simulator.destroy()
 
     def _handle_command(self, command):
@@ -141,16 +136,10 @@ class FifoThead:
 def main():
     print('starting scroll pHAT simulator')
 
-    if len(sys.argv) != 2:
-        print('need to specify fifo name')
-        sys.exit(1)
-
-    fifo_name = sys.argv[1]
-
     signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
 
     phat = TkPhatSimulator()
-    thread = FifoThead(fifo_name, phat)
+    thread = ReadThread(phat)
     thread.start()
     phat.run()
 
