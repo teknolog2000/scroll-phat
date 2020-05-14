@@ -9,11 +9,13 @@ import signal
 
 ROWS = 5
 COLUMNS = 11
-PIXELS_PER_LED = 50
-LINE_WIDTH = 5
+LED_SIZE_PX = 50
+LINE_WIDTH_PX = 5
 
-WINDOW_HEIGHT = PIXELS_PER_LED * ROWS + LINE_WIDTH * (ROWS - 1)
-WINDOW_WIDTH = PIXELS_PER_LED * COLUMNS + LINE_WIDTH * (COLUMNS - 1)
+WINDOW_HEIGHT_PX = LED_SIZE_PX * ROWS + LINE_WIDTH_PX * (ROWS - 1)
+WINDOW_WIDTH_PX = LED_SIZE_PX * COLUMNS + LINE_WIDTH_PX * (COLUMNS - 1)
+
+DRAW_TIMEOUT_MS = 100
 
 
 class Cmds(Enum):
@@ -50,9 +52,9 @@ class TkPhatSimulator(ScrollPhatSimulator):
         self.root.protocol('WM_DELETE_WINDOW', self.destroy)
 
         self.root.title('scroll pHAT simulator')
-        self.root.geometry('{}x{}'.format(WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.root.geometry('{}x{}'.format(WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX))
         self.canvas = tk.Canvas(
-            self.root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
+            self.root, width=WINDOW_WIDTH_PX, height=WINDOW_HEIGHT_PX)
         self.canvas.config(highlightthickness=0)
 
     def run(self):
@@ -73,21 +75,21 @@ class TkPhatSimulator(ScrollPhatSimulator):
 
         self.canvas.delete(tk.ALL)
         self.canvas.create_rectangle(
-            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, width=0, fill='black')
+            0, 0, WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX, width=0, fill='black')
 
         color = '#%02x%02x%02x' % (
             self.brightness, self.brightness, self.brightness)
 
         for col in range(COLUMNS):
             for row in range(ROWS):
-                x = (PIXELS_PER_LED + LINE_WIDTH) * col
-                y = (PIXELS_PER_LED + LINE_WIDTH) * row
-                self.canvas.create_rectangle(x, y, x + PIXELS_PER_LED, y + PIXELS_PER_LED, width=0, fill=color
+                x = (LED_SIZE_PX + LINE_WIDTH_PX) * col
+                y = (LED_SIZE_PX + LINE_WIDTH_PX) * row
+                self.canvas.create_rectangle(x, y, x + LED_SIZE_PX, y + LED_SIZE_PX, width=0, fill=color
                                              if self.pixels[col][row] else 'black')
 
         self.canvas.pack()
 
-        self.root.after(100, self.draw_pixels)
+        self.root.after(DRAW_TIMEOUT_MS, self.draw_pixels)
 
     def set_pixels(self, vals):
         for col in range(COLUMNS):
@@ -111,12 +113,14 @@ class ReadThread:
     def start(self):
         self.stdin_thread.start()
 
+    def join(self):
+        self.stdin_thread.join()
+
     def _read_stdin(self):
-        while True:
+        while self.scroll_phat_simulator.running:
             try:
                 self._handle_command(pickle.load(sys.stdin.buffer))
-            except EOFError as err:
-                print(err)
+            except EOFError:
                 self.scroll_phat_simulator.destroy()
             except Exception as err:
                 print(err)
@@ -142,6 +146,7 @@ def main():
     thread = ReadThread(phat)
     thread.start()
     phat.run()
+    thread.join()
 
 
 if __name__ == "__main__":
